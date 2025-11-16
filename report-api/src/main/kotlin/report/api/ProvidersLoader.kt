@@ -10,4 +10,4 @@ object ReportProviders {
 
     fun findById(id: String): ReportProvider? =
         loadAll().find { it.id == id }
-}
+    }
