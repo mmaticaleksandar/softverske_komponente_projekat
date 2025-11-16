@@ -1,0 +1,12 @@
+CLI Report
+==========
+
+ No  name       quantity  price
+
+  1  Banana     10        1.2  
+  2  Apple      5         2.5  
+  3  Orange     7         1.8  
+  4  Pineapple  2         3.0  
+  5  Kiwi       12        0.9  
+
+Total rows: 5.0
