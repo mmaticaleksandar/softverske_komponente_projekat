@@ -4,3 +4,11 @@ Apple,5,2.5
 Orange,7,1.8
 Pineapple,2,3.0
 Kiwi,12,0.9
+
+
+name,quantity, price
+Audi,10,1.2
+Opel,5,2.5
+Mercedes,7,1.8
+BMV,2,3.0
+VW,12,0.9

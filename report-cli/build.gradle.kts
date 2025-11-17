@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm")
     application
+    id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
 
@@ -15,6 +16,8 @@ dependencies {
     implementation(project(":report-txt"))
     implementation(project(":report-htmlpdf"))
     implementation(project(":report-md"))
+    implementation("org.mariadb.jdbc:mariadb-java-client:3.3.3")
+
 }
 
 

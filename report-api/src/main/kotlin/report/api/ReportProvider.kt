@@ -13,7 +13,7 @@ interface ReportGenerator {
 }
 // Provider – SPI entry point
 interface ReportProvider {
-    val id: String                     // tehnički ID, npr "txt"
+    val id: String                     // tehnički ID, npr "txt" na osnovu kog se odlucuje koji se Fajl pravi
     val displayName: String            // za korisnički prikaz, npr "Plain text TXT"
     val supportedFormats: Set<ReportFormat>
 

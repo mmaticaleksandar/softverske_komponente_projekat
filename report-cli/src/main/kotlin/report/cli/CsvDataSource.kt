@@ -1,58 +1,99 @@
 package report.cli
 
 import report.api.*
-import java.nio.file.Path
 import java.nio.file.Files
+import java.nio.file.Path
 
 class CsvDataSource(
     private val path: Path,
-    private val hasHeader: Boolean = true
-) {
+    private val separator: Char = ','
+) : DataSource {
 
-    fun load(): TableData {
-        //Citamo sve linije fajla
-        val lines = Files.readAllLines(path).filter { it.isNotBlank() }
+    override fun load(): List<ReportSection> = loadSections()
 
+    fun loadSections(): List<ReportSection> {
 
-        //Proveravamo da li je gajl prazan, ako jesete vracamo poruku
-        require(lines.isNotEmpty()) { "CSV file is empty" }
+        val lines = Files.readAllLines(path)
+            .map { it.trim() }
 
-        //Ako ima header, smestamo ga u header, aa ako nema brojimo koliko ima kolona i pravimo imena kolona
-        val header = if (hasHeader) {
-            lines.first().split(",")
-        } else {
-            val cols = lines.first().split(",").size
-            (1..cols).map { "col$it" }
-        }
-        //Ako ima header preskacemo jedan reed
-        val entries = if (hasHeader) lines.drop(1) else lines
+        val sections = mutableListOf<ReportSection>()
 
+        var index = 0
+        var sectionNumber = 1
 
-        //Pravimo nazive za kolone
-        val cols = header.map {
-            ColumnDefinition(
-                name = it.trim(),
-                title = it.trim(),
-                type = ColumnType.STRING
-            )
-        }
+        while (index < lines.size) {
 
+            // preskačemo prazne linije
+            while (index < lines.size && lines[index].isBlank()) index++
 
-        val rows = entries.map { line ->
-            //Delimo red po zarezu
-            val parts = line.split(",")
+            if (index >= lines.size) break
 
+            val maybeTitle = lines[index]
+            val title: String
+            index++
 
-            val map = mutableMapOf<String, Any?>()
-
-            //Ide po svim kolonama, koristi se ime kolone kao kljuc i smesta se vrednost
-            header.forEachIndexed { idx, col ->
-                map[col.trim()] = parts.getOrNull(idx)?.trim()
+            // ako linija NEMA separator → to je naslov
+            // ako linija IMA separator → to je odmah header (nema title)
+            if (!maybeTitle.contains(separator)) {
+                title = maybeTitle
+            } else {
+                title = "Section $sectionNumber"
+                index--  // vrati se nazad jer je ovo header
             }
-            //Smesta u jedan row podatke iz mape
-            Row(map)
+
+            if (index >= lines.size)
+                throw IllegalArgumentException("Missing header after section $title")
+
+            val headerLine = lines[index]
+            val header = headerLine.split(separator).map { it.trim() }
+            index++
+
+            val rows = mutableListOf<Row>()
+
+            while (index < lines.size && lines[index].isNotBlank()) {
+                val parts = lines[index].split(separator)
+
+                val map = mutableMapOf<String, Any?>()
+                header.forEachIndexed { idx, col ->
+                    map[col] = parts.getOrNull(idx)?.trim()
+                }
+
+                rows.add(Row(map))
+                index++
+            }
+
+            val columns = header.map { col ->
+                ColumnDefinition(
+                    name = col,
+                    title = col,
+                    type = ColumnType.STRING
+                )
+            }
+
+            val table = TableData(columns, rows)
+
+            sections.add(
+                ReportSection(
+                    title = title,
+                    showRowNumbers = true,
+                    table = table,
+                    summaryItems = listOf(
+                        SummaryItem(
+                            label = "Rows in section",
+                            value = SummaryValue.Aggregation(
+                                AggregationFunction.COUNT,
+                                columns.first().name
+                            )
+                        )
+                    )
+                )
+            )
+
+            sectionNumber++
+            index++
         }
-        //Vraca tabelu sa podacima
-        return TableData(cols, rows)
+
+        return sections
     }
+
 }

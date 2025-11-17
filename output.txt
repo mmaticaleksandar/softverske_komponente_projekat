@@ -1,5 +1,5 @@
-CLI Report
-==========
+Section 1
+=========
 
  No  name       quantity  price
 
@@ -9,4 +9,18 @@ CLI Report
   4  Pineapple  2         3.0  
   5  Kiwi       12        0.9  
 
-Total rows: 5.0
+Rows in section: 5.0
+
+
+Section 2
+=========
+
+ No  name      quantity  price
+
+  1  Audi      10        1.2  
+  2  Opel      5         2.5  
+  3  Mercedes  7         1.8  
+  4  BMV       2         3.0  
+  5  VW        12        0.9  
+
+Rows in section: 5.0

@@ -1,74 +1,119 @@
 package report.cli
 
 import report.api.*
-import java.nio.file.*
+import java.nio.file.Path
+import java.nio.file.Files
+import java.util.Scanner
 
 fun main(args: Array<String>) {
-    println("Upustvo: <Path> <providerId> <format> <outputPath>")
-    //Proverava broj argumenata, potrebana su cetiri
-    if (args.size < 4) {
-        println("Greska unesite u obliku: <Path> <providerId> <format> <outputPath>")
+
+    if (args.isEmpty()) {
+        println("Greska: Morate uneti parametre za fajl ili bazu.")
+        println("Primeri:")
+        println("  --file C:/path/data.csv")
+        println("  --dburl jdbc:mysql://localhost:3306/test --user root --pass 123 --table customers")
         return
     }
 
-    val csvPath = Path.of(args[0])
-    val providerId = args[1]
-    val formatString = args[2]
-    val outputPath = Path.of(args[3])
+    // ================================
+    // 1) PARSIRANJE ARGUMENATA
+    // ================================
 
+    var filePath: String? = null
+    var dbUrl: String? = null
+    var dbUser: String? = null
+    var dbPass: String? = null
+    var dbTable: String? = null
 
-    //Gledamo koji je format prosledjen
-    val format =
-        when (formatString.lowercase()) {
-            "txt" -> ReportFormat.PLAIN_TEXT
-            "html" -> ReportFormat.HTML
-            "pdf" -> ReportFormat.PDF
-            "md" -> ReportFormat.MARKDOWN
-            else -> {
-                println("Unknown format: $formatString")
-                return
-            }
+    var i = 0
+    while (i < args.size) {
+        when (args[i]) {
+            "--file" -> filePath = args.getOrNull(i + 1)
+            "--dburl" -> dbUrl = args.getOrNull(i + 1)
+            "--user" -> dbUser = args.getOrNull(i + 1)
+            "--pass" -> dbPass = args.getOrNull(i + 1)
+            "--table" -> dbTable = args.getOrNull(i + 1)
+        }
+        i++
+    }
+
+    // ================================
+    // 2) VALIDACIJA
+    // ================================
+
+    val dataSource: DataSource
+
+    if (filePath != null) {
+        val path = Path.of(filePath!!)
+        if (!Files.exists(path)) {
+            println("Greska: fajl ne postoji → $filePath")
+            return
         }
 
-    //Trazimo providera na osnovu providerId-a( da li je txt, html, md)
+        val ext = filePath!!.substringAfterLast(".").lowercase()
+        dataSource = when (ext) {
+            "csv" -> CsvDataSource(path)
+            else  -> error("Nepodrzan tip fajla: $ext")
+        }
+    }
+    else if (dbUrl != null && dbUser != null && dbPass != null && dbTable != null) {
+        dataSource = DatabaseDataSource(dbUrl!!, dbUser!!, dbPass!!, dbTable!!)
+    }
+    else {
+        println("Greska: morate navesti ili --file putanju ili --db parametre.")
+        return
+    }
+
+    // ================================
+    // 3) UCITAVANJE PODATAKA
+    // ================================
+    val sections = dataSource.load()   // CSV/TXT/MD/Baza → vise sectiona
+
+    // ================================
+    // 4) IZBOR PROVIDERA
+    // ================================
     val providers = ReportProviders.loadAll()
-    val provider = providers.find { it.id == providerId }
-    if (provider == null) {
-        println("Provider '$providerId' not found.")
-        return
+    println("Dostupni provideri:")
+    providers.forEachIndexed { idx, p ->
+        println("[${idx + 1}] ${p.displayName}")
     }
 
-    //Ako provider ne podrzava format, ispisuje se poruka
-    if (!provider.supportedFormats.contains(format)) {
-        println("Provider '$providerId' does not support format $format.")
-        return
+    val scanner = Scanner(System.`in`)
+    var providerChoice: Int? = null
+    while (providerChoice !in 1..providers.size) {
+        print("Izaberite providera: ")
+        providerChoice = scanner.nextLine().toIntOrNull()
     }
 
+    val provider = providers[providerChoice!! - 1]
 
-    //Ucitavanje podataka iz CSV-a
-    val data = CsvDataSource(csvPath).load()
+    // ================================
+    // 5) IZBOR FORMATA NA OSNOVU PROVIDERA
+    // ================================
+    val availableFormats = provider.supportedFormats.toList()
 
+    println("Dostupni formati:")
+    availableFormats.forEachIndexed { idx, f ->
+        println("[${idx + 1}] $f")
+    }
 
-    //Kreiranje ReportDocumenta
-    val document = ReportDocument(
-        sections = listOf(
-            ReportSection(
-                title = "CLI Report", //Naziv dela
-                showRowNumbers = true, //Da li se pokazuje redni broj reda
-                table = data,
-                summaryItems = listOf(  //Lista suma ispod tabele
-                    SummaryItem(
-                        "Total rows",
-                        SummaryValue.Aggregation(AggregationFunction.COUNT, data.columns.first().name)
-                    )
-                )
-            )
-        )
-    )
+    var formatChoice: Int? = null
+    while (formatChoice !in 1..availableFormats.size) {
+        print("Izaberite format: ")
+        formatChoice = scanner.nextLine().toIntOrNull()
+    }
+
+    val format = availableFormats[formatChoice!! - 1]
+
+    // ================================
+    // 6) GENERISANJE DOKUMENTA
+    // ================================
+    val document = ReportDocument(sections)
 
     val generator = provider.createGenerator(format)
-    val bytes = generator.generate(document)
-    Files.write(outputPath, bytes)
+    val outputFileName = "output.${generator.fileExtension}"
 
-    println("Report written to $outputPath")
+    Files.write(Path.of(outputFileName), generator.generate(document))
+
+    println("Izvestaj generisan kao: $outputFileName")
 }
